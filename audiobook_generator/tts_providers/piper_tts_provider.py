@@ -1,7 +1,7 @@
-import tempfile
-from subprocess import run
-from pathlib import Path
 import logging
+import tempfile
+from pathlib import Path
+from subprocess import run
 
 from pydub import AudioSegment
 
@@ -57,9 +57,7 @@ class PiperTTSProvider(BaseTTSProvider):
                 "--debug",
             ]
 
-            logger.info(
-                f"Running Piper TTS command: {' '.join(str(arg) for arg in cmd)}"
-            )
+            logger.info(f"Running Piper TTS command: {' '.join(str(arg) for arg in cmd)}")
             run(
                 cmd,
                 input=text.encode("utf-8"),

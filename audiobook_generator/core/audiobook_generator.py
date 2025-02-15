@@ -113,9 +113,9 @@ class AudiobookGenerator:
 
             # Prompt user to continue if not in preview mode
             if self.config.no_prompt:
-                logger.info(f"Skipping prompt as passed parameter no_prompt")
+                logger.info("Skipping prompt as passed parameter no_prompt")
             elif self.config.preview:
-                logger.info(f"Skipping prompt as in preview mode")
+                logger.info("Skipping prompt as in preview mode")
             else:
                 confirm_conversion()
 
@@ -132,7 +132,7 @@ class AudiobookGenerator:
             with multiprocessing.Pool(processes=self.config.worker_count) as pool:
                 pool.starmap(self.process_chapter, tasks)
 
-            logger.info(f"All chapters converted. 🎉🎉🎉")
+            logger.info("All chapters converted. 🎉🎉🎉")
         except KeyboardInterrupt:
             logger.info("Job stopped by user.")
             exit()

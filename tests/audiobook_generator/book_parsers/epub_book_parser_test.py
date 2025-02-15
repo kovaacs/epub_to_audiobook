@@ -17,17 +17,19 @@ class TestGetBookParser(unittest.TestCase):
         self.assertIsInstance(parser, EpubBookParser)
         self.assertEqual(parser.get_book_author(), "Daniel Defoe")
         self.assertEqual(parser.get_book_title(), "The Life and Adventures of Robinson Crusoe")
-        self.assertEqual(parser._sanitize_title("   "), "The_Life_and_Adventures_of_Robinson_Crusoe")
+        self.assertEqual(
+            parser._sanitize_title("   "), "The_Life_and_Adventures_of_Robinson_Crusoe"
+        )
         self.assertEqual(len(parser.get_chapters("   ")), 24)
 
     def test_unsupported_file_format(self):
         # Set up a config mock with an unsupported file extension
-        config = MagicMock(input_file='book.unsupported')
+        config = MagicMock(input_file="book.unsupported")
 
         # Assert that NotImplementedError is raised for unsupported formats
         with self.assertRaises(NotImplementedError):
             get_book_parser(config)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

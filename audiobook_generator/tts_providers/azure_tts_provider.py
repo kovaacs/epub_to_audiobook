@@ -5,10 +5,11 @@ import math
 import os
 from datetime import datetime, timedelta
 from time import sleep
+
 import requests
 
-from audiobook_generator.core.audio_tags import AudioTags
 from audiobook_generator.config.general_config import GeneralConfig
+from audiobook_generator.core.audio_tags import AudioTags
 from audiobook_generator.core.utils import split_text, set_audio_tags
 from audiobook_generator.tts_providers.base_tts_provider import BaseTTSProvider
 
@@ -39,16 +40,14 @@ class AzureTTSProvider(BaseTTSProvider):
                 "Please set MS_TTS_KEY and MS_TTS_REGION environment variables. Check https://github.com/p0n1/epub_to_audiobook#how-to-get-your-azure-cognitive-service-key."
             )
 
-        self.TOKEN_URL = (
-            f"https://{region}.api.cognitive.microsoft.com/sts/v1.0/issuetoken"
-        )
+        self.TOKEN_URL = f"https://{region}.api.cognitive.microsoft.com/sts/v1.0/issuetoken"
         self.TOKEN_HEADERS = {"Ocp-Apim-Subscription-Key": subscription_key}
         self.TTS_URL = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
 
     def __str__(self) -> str:
         return (
-                super().__str__()
-                + f", voice_name={self.config.voice_name}, language={self.config.language}, break_duration={self.config.break_duration}, output_format={self.config.output_format}"
+            super().__str__()
+            + f", voice_name={self.config.voice_name}, language={self.config.language}, break_duration={self.config.break_duration}, output_format={self.config.output_format}"
         )
 
     def is_access_token_expired(self) -> bool:
@@ -56,9 +55,7 @@ class AzureTTSProvider(BaseTTSProvider):
 
     def auto_renew_access_token(self) -> str:
         if self.access_token is None or self.is_access_token_expired():
-            logger.info(
-                f"azure tts access_token doesn't exist or is expired, getting new one"
-            )
+            logger.info("azure tts access_token doesn't exist or is expired, getting new one")
             self.access_token = self.get_access_token()
             self.token_expiry_time = datetime.utcnow() + timedelta(minutes=9, seconds=1)
         return self.access_token
@@ -77,16 +74,16 @@ class AzureTTSProvider(BaseTTSProvider):
                     f"Network error while getting access token (attempt {retry + 1}/{MAX_RETRIES}): {e}"
                 )
                 if retry < MAX_RETRIES - 1:
-                    sleep(2 ** retry)
+                    sleep(2**retry)
                 else:
                     raise e
         raise Exception("Failed to get access token")
 
     def text_to_speech(
-            self,
-            text: str,
-            output_file: str,
-            audio_tags: AudioTags,
+        self,
+        text: str,
+        output_file: str,
+        audio_tags: AudioTags,
     ):
         # Adjust this value based on your testing
         max_chars = 1800 if self.config.language.startswith("zh") else 3000
@@ -121,9 +118,7 @@ class AzureTTSProvider(BaseTTSProvider):
                     "User-Agent": "Python",
                 }
                 try:
-                    logger.info(
-                        "Sending request to Azure TTS, data length: " + str(len(ssml))
-                    )
+                    logger.info("Sending request to Azure TTS, data length: " + str(len(ssml)))
                     response = requests.post(
                         self.TTS_URL, headers=headers, data=ssml.encode("utf-8")
                     )
@@ -139,7 +134,7 @@ class AzureTTSProvider(BaseTTSProvider):
                         f"Error while converting text to speech (attempt {retry + 1}): {e}"
                     )
                     if retry < MAX_RETRIES - 1:
-                        sleep(2 ** retry)
+                        sleep(2**retry)
                     else:
                         raise e
 
@@ -171,7 +166,9 @@ class AzureTTSProvider(BaseTTSProvider):
         elif self.config.output_format.endswith("mp3"):
             return "mp3"
         else:
-            raise NotImplementedError(f"Unknown file extension for output format: {self.config.output_format}")
+            raise NotImplementedError(
+                f"Unknown file extension for output format: {self.config.output_format}"
+            )
 
     def validate_config(self):
         # TODO: Need to dig into Azure properties, im not familiar with them, but look at OpenAI as ref example

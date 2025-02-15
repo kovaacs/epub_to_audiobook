@@ -4,11 +4,10 @@ import math
 
 from openai import OpenAI
 
-from audiobook_generator.core.audio_tags import AudioTags
 from audiobook_generator.config.general_config import GeneralConfig
+from audiobook_generator.core.audio_tags import AudioTags
 from audiobook_generator.core.utils import split_text, set_audio_tags
 from audiobook_generator.tts_providers.base_tts_provider import BaseTTSProvider
-
 
 logger = logging.getLogger(__name__)
 

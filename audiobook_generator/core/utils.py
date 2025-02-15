@@ -2,7 +2,7 @@ import logging
 from typing import List
 
 from mutagen.id3 import ID3, ID3NoHeaderError
-from mutagen.id3._frames import TIT2, TPE1, TALB, TRCK, APIC
+from mutagen.id3._frames import TIT2, TPE1, TALB, TRCK
 
 logger = logging.getLogger(__name__)
 

@@ -1,11 +1,11 @@
 import asyncio
+import io
 import logging
 import math
-import io
+from typing import Union
 
 import edge_tts
 from edge_tts import list_voices
-from typing import Union
 from pydub import AudioSegment
 
 from audiobook_generator.config.general_config import GeneralConfig
@@ -56,11 +56,9 @@ class CommWithPauses:
         self.file = io.BytesIO()
 
     def parse_text(self):
-        logger.debug(
-            f"Parsing the text, looking for break/pauses in text: <{self.full_text}>"
-        )
+        logger.debug(f"Parsing the text, looking for break/pauses in text: <{self.full_text}>")
         if self.break_string not in self.full_text:
-            logger.debug(f"No break/pauses found in the text")
+            logger.debug("No break/pauses found in the text")
             return [self.full_text]
 
         parts = self.full_text.split(self.break_string)
@@ -68,7 +66,7 @@ class CommWithPauses:
         return parts
 
     async def chunkify(self):
-        logger.debug(f"Chunkifying the text")
+        logger.debug("Chunkifying the text")
         for content in self.parsed:
             logger.debug(f"content from parsed: <{content}>")
             audio_bytes = await self.generate_audio(content)
@@ -77,10 +75,10 @@ class CommWithPauses:
                 # only same break duration for all breaks is supported now
                 pause_bytes = self.generate_pause(self.break_duration)
                 self.file.write(pause_bytes)
-        logger.debug(f"Chunkifying done")
+        logger.debug("Chunkifying done")
 
     def generate_pause(self, time: int) -> bytes:
-        logger.debug(f"Generating pause")
+        logger.debug("Generating pause")
         # pause time should be provided in ms
         silent: AudioSegment = AudioSegment.silent(time, 24000)
         return silent.raw_data  # type: ignore
@@ -97,14 +95,12 @@ class CommWithPauses:
         temp_chunk.seek(0)
         # handle the case where the chunk is empty
         try:
-            logger.debug(f"Decoding the chunk")
+            logger.debug("Decoding the chunk")
             decoded_chunk = AudioSegment.from_mp3(temp_chunk)
         except Exception as e:
-            logger.warning(
-                f"Failed to decode the chunk, reason: {e}, returning a silent chunk."
-            )
+            logger.warning(f"Failed to decode the chunk, reason: {e}, returning a silent chunk.")
             decoded_chunk = AudioSegment.silent(0, 24000)
-        logger.debug(f"Returning the decoded chunk")
+        logger.debug("Returning the decoded chunk")
         return decoded_chunk.raw_data  # type: ignore
 
     async def save(
@@ -117,7 +113,7 @@ class CommWithPauses:
         audio: AudioSegment = AudioSegment.from_raw(
             self.file, sample_width=2, frame_rate=24000, channels=1
         )
-        logger.debug(f"Exporting the audio")
+        logger.debug("Exporting the audio")
         audio.export(audio_fname)
         logger.info(f"Saved the audio to: {audio_fname}")
 
@@ -144,9 +140,7 @@ class EdgeTTSProvider(BaseTTSProvider):
         supported_voices = asyncio.run(get_supported_voices())
         # logger.debug(f"Supported voices: {supported_voices}")
         if self.config.voice_name not in supported_voices:
-            raise ValueError(
-                f"EdgeTTS: Unsupported voice name: {self.config.voice_name}"
-            )
+            raise ValueError(f"EdgeTTS: Unsupported voice name: {self.config.voice_name}")
 
     def text_to_speech(
         self,

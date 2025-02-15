@@ -15,14 +15,14 @@ class TestOpenAiTtsProvider(unittest.TestCase):
         with self.assertRaises(OpenAIError):
             get_tts_provider(config)
 
-    @patch.dict('os.environ', {'OPENAI_API_KEY': 'fake_key'})
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "fake_key"})
     def test_estimate_cost(self):
         config = get_openai_config()
         tts_provider = get_tts_provider(config)
         self.assertIsInstance(tts_provider, OpenAITTSProvider)
         self.assertEqual(tts_provider.estimate_cost(1000000), 15)
 
-    @patch.dict('os.environ', {'OPENAI_API_KEY': 'fake_key'})
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "fake_key"})
     def test_default_args(self):
         config = get_openai_config()
         config.model_name = None
@@ -35,5 +35,5 @@ class TestOpenAiTtsProvider(unittest.TestCase):
         self.assertEqual(tts_provider.config.output_format, "mp3")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

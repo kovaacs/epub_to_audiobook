@@ -13,14 +13,14 @@ class TestAzureTtsProvider(unittest.TestCase):
         with self.assertRaises(ValueError):
             get_tts_provider(config)
 
-    @patch.dict('os.environ', {'MS_TTS_KEY': 'fake_key', 'MS_TTS_REGION': 'fake_region'})
+    @patch.dict("os.environ", {"MS_TTS_KEY": "fake_key", "MS_TTS_REGION": "fake_region"})
     def test_estimate_cost(self):
         config = get_azure_config()
         tts_provider = get_tts_provider(config)
         self.assertIsInstance(tts_provider, AzureTTSProvider)
         self.assertEqual(tts_provider.estimate_cost(1000000), 16)
 
-    @patch.dict('os.environ', {'MS_TTS_KEY': 'fake_key', 'MS_TTS_REGION': 'fake_region'})
+    @patch.dict("os.environ", {"MS_TTS_KEY": "fake_key", "MS_TTS_REGION": "fake_region"})
     def test_default_args(self):
         config = get_azure_config()
         config.voice_name = None
@@ -31,5 +31,5 @@ class TestAzureTtsProvider(unittest.TestCase):
         self.assertEqual(tts_provider.config.output_format, "audio-24khz-48kbitrate-mono-mp3")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

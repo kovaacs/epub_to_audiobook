@@ -1,9 +1,8 @@
-import os
 import asyncio
 import logging
+import os
 import timeit
 from typing import Optional, Union, List, Tuple
-
 
 from pydub import AudioSegment
 from wyoming.client import AsyncTcpClient
@@ -48,9 +47,7 @@ class PiperCommWithPauses:
 
         parts = self.full_text.split(self.break_string)
         parts = [part for part in parts if part.strip() != ""]
-        new_parts = [
-            self.break_string.join(parts[i : i + 10]) for i in range(0, len(parts), 10)
-        ]
+        new_parts = [self.break_string.join(parts[i : i + 10]) for i in range(0, len(parts), 10)]
         logger.debug(f"Split into {len(new_parts)} parts")
         return new_parts
 
@@ -77,9 +74,7 @@ class PiperCommWithPauses:
             return b"", 0, 0, 0
         return audio_data, sample_rate, sample_width, channels
 
-    async def synthesize_and_convert(
-        self, idx_text: Tuple[int, str]
-    ) -> Tuple[int, AudioSegment]:
+    async def synthesize_and_convert(self, idx_text: Tuple[int, str]) -> Tuple[int, AudioSegment]:
         """Asynchronously synthesizes text and returns a tuple of index and AudioSegment."""
         idx, text = idx_text
         audio_data, rate, width, channels = await self.synthesize(text)
@@ -111,8 +106,7 @@ class PiperCommWithPauses:
         sem = asyncio.Semaphore(max_concurrent_tasks)
 
         tasks = [
-            self.synthesize_and_convert_with_semaphore(idx_text, sem)
-            for idx_text in indexed_texts
+            self.synthesize_and_convert_with_semaphore(idx_text, sem) for idx_text in indexed_texts
         ]
 
         results = []
