@@ -108,8 +108,9 @@ class AudiobookGenerator:
                 chapters[self.config.chapter_start - 1 : self.config.chapter_end]
             )
             logger.info(f"✨ Total characters in selected book chapters: {total_characters} ✨")
-            rough_price = tts_provider.estimate_cost(total_characters)
-            print(f"Estimate book voiceover would cost you roughly: ${rough_price:.2f}\n")
+
+            if rough_price := tts_provider.estimate_cost(total_characters):
+                logger.info("Estimate book voiceover would cost you roughly: $%.2f", rough_price)
 
             # Prompt user to continue if not in preview mode
             if self.config.no_prompt:
