@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 from pathlib import Path
+
 import openai
 
 from audiobook_generator.book_parsers.base_book_parser import get_book_parser
@@ -10,20 +11,28 @@ from audiobook_generator.tts_providers.base_tts_provider import get_tts_provider
 
 logger = logging.getLogger(__name__)
 
+
 def generate_summary(text):
     """Generate a summary using OpenAI's GPT model."""
     try:
         client = openai.OpenAI(
             api_key="your-api-key",  # Replace with your actual API key
-            base_url="http://host.docker.internal:8080"  # Custom API base URL
+            base_url="http://host.docker.internal:8080/v1",  # Custom API base URL
         )
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Summarize the following book chapter in way that captures the most important details."},
-                {"role": "user", "content": text}
-            ]
+                {
+                    "role": "system",
+                    "content": "You are given a book chapter. Write a summary in a concise and comprehensive way, ensuring it covers all the key events and information presented. Your goal is to provide enough detail about the characters, the events and so forth, that someone who didn't fully pay attention to the chapter could understand what happened and feel prepared to continue reading. Stick to the facts presented in the summary and avoid any speculation, analysis, or personal opinions. Do not use bullet points, the output should be formatted as regular paragraphs.",
+                },
+                {
+                    "role": "user",
+                    "content": text,
+                },
+            ],
         )
+
         return response.choices[0].message.content.strip()
     except Exception as e:
         logger.error(f"Failed to generate summary: {e}")
@@ -46,7 +55,8 @@ class AudiobookGenerator:
     def __init__(self, config: GeneralConfig):
         self.config = config
 
-    def process_chapter(self, idx, title, text, book_parser, tts_provider):
+    def process_chapter(self, args):
+        idx, title, text, book_parser, tts_provider = args
         try:
             logger.info(f"Processing chapter {idx}: {title}")
 
@@ -57,8 +67,13 @@ class AudiobookGenerator:
             if self.config.preview:
                 return
 
-            output_file = self.config.output_folder / f"{idx:04d}_{title}.{tts_provider.get_output_file_extension()}"
-            audio_tags = AudioTags(title, book_parser.get_book_author(), book_parser.get_book_title(), idx)
+            output_file = (
+                self.config.output_folder
+                / f"{idx:04d}_{title}.{tts_provider.get_output_file_extension()}"
+            )
+            audio_tags = AudioTags(
+                title, book_parser.get_book_author(), book_parser.get_book_title(), idx
+            )
             tts_provider.text_to_speech(text, output_file, audio_tags)
             logger.info(f"✅ Converted chapter {idx}: {title}")
         except Exception:
@@ -77,34 +92,33 @@ class AudiobookGenerator:
                 logger.info("🖼️ Cover image saved as %s", cover_path.name)
 
             chapters = book_parser.get_chapters(tts_provider.get_break_string())
-            chapters = [(title, text) for title, text in chapters if text.strip()]
-            logger.info(f"Chapters count: {len(chapters)}.")
-
-            if self.config.chapter_end == -1:
-                self.config.chapter_end = len(chapters)
-
-            chapters_to_process = chapters[self.config.chapter_start - 1: self.config.chapter_end]
-            summaries = [(f"Summary of {title}", generate_summary(text)) for title, text in chapters_to_process]
-            chapters_to_process.extend(summaries)
-
-            total_characters = get_total_chars(chapters_to_process)
-            logger.info(f"✨ Total characters in book + summaries: {total_characters} ✨")
-
-            if rough_price := tts_provider.estimate_cost(total_characters):
-                logger.info("Estimate cost: $%.2f", rough_price)
 
             if not self.config.no_prompt and not self.config.preview:
                 confirm_conversion()
 
             tasks = (
                 (idx, title, text, book_parser, tts_provider)
-                for idx, (title, text) in enumerate(chapters_to_process, start=1)
+                for idx, (title, text) in enumerate(self.chapter_iterator(chapters), start=1)
             )
 
             with multiprocessing.Pool(processes=self.config.worker_count) as pool:
-                pool.starmap(self.process_chapter, tasks)
+                for _ in pool.imap_unordered(self.process_chapter, tasks):
+                    pass
 
             logger.info("All chapters and summaries converted. 🎉")
         except KeyboardInterrupt:
             logger.info("Job stopped by user.")
             exit()
+
+    def chapter_iterator(self, chapters):
+        chapters = [(title, text) for title, text in chapters if text.strip()]
+        logger.info(f"Chapters count: {len(chapters)}.")
+        if self.config.chapter_end == -1:
+            self.config.chapter_end = len(chapters)
+        chapters_to_process = chapters[self.config.chapter_start - 1 : self.config.chapter_end]
+
+        for chapter in chapters_to_process:
+            title, text = chapter
+
+            yield title, text
+            yield f"Summary_of_{title}", "Chapter summary\n\n" + generate_summary(text)
