@@ -1,8 +1,10 @@
 import logging
 import multiprocessing
+from collections.abc import Iterator
 from pathlib import Path
 
 import openai
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from audiobook_generator.book_parsers.base_book_parser import get_book_parser
 from audiobook_generator.config.general_config import GeneralConfig
@@ -11,31 +13,46 @@ from audiobook_generator.tts_providers.base_tts_provider import get_tts_provider
 
 logger = logging.getLogger(__name__)
 
+client = openai.OpenAI(
+    api_key="your-api-key",  # Replace with your actual API key
+    base_url="http://host.docker.internal:8080/v1",  # Custom API base URL
+)
+
+def split_text(text):
+    # Set up text splitter for MapReduce: aim for chunks that fit comfortably within 8192 tokens
+    # We'll assume around 4 characters per token on average
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=3000,  # Approx. ~750 tokens
+        chunk_overlap=200
+    )
+
+    yield from text_splitter.split_text(text)
+
+def gen_sum(chunk:str)->str:
+    return client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are given an excerpt from a book chapter. Write a summary in a concise and comprehensive way, ensuring it covers all the key events and information presented. Your goal is to provide enough detail about the characters, the events and so forth, that someone who didn't fully pay attention to the chapter could understand what happened and feel prepared to continue reading. Stick to the facts presented in the summary and avoid any speculation, analysis, or personal opinions. Do not use bullet points, the output should be formatted as regular paragraphs.",
+            },
+            {
+                "role": "user",
+                "content": chunk.strip(),
+            },
+        ],
+    ).choices[0].message.content.strip()
+
+def chunk_summary_iterator(text:str)->Iterator[str]:
+    for chunk in split_text(text):
+        yield gen_sum(chunk)
 
 def generate_summary(text):
     """Generate a summary using OpenAI's GPT model."""
     try:
-        client = openai.OpenAI(
-            api_key="your-api-key",  # Replace with your actual API key
-            base_url="http://host.docker.internal:8080/v1",  # Custom API base URL
-        )
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are given a book chapter. Write a summary in a concise and comprehensive way, ensuring it covers all the key events and information presented. Your goal is to provide enough detail about the characters, the events and so forth, that someone who didn't fully pay attention to the chapter could understand what happened and feel prepared to continue reading. Stick to the facts presented in the summary and avoid any speculation, analysis, or personal opinions. Do not use bullet points, the output should be formatted as regular paragraphs.",
-                },
-                {
-                    "role": "user",
-                    "content": text,
-                },
-            ],
-        )
-
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        logger.error(f"Failed to generate summary: {e}")
+        return "/n/n".join(chunk_summary_iterator(text))
+    except Exception:
+        logger.exception("Failed to generate summary:")
         return "Summary not available."
 
 
@@ -120,5 +137,5 @@ class AudiobookGenerator:
         for chapter in chapters_to_process:
             title, text = chapter
 
-            yield title, text
+            # yield title, text
             yield f"Summary_of_{title}", "Chapter summary\n\n" + generate_summary(text)
