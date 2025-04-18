@@ -1,6 +1,6 @@
 import logging
 import multiprocessing
-from collections.abc import Iterator
+from collections.abc import Iterator, Iterable
 from pathlib import Path
 
 import openai
@@ -14,90 +14,103 @@ from audiobook_generator.tts_providers.base_tts_provider import get_tts_provider
 logger = logging.getLogger(__name__)
 
 client = openai.OpenAI(
-    api_key="your-api-key",  # Replace with your actual API key
-    base_url="http://host.docker.internal:8080/v1",  # Custom API base URL
+    api_key="your-api-key",
+    base_url="http://host.docker.internal:8080/v1",
 )
 
-def split_text(text):
-    # Set up text splitter for MapReduce: aim for chunks that fit comfortably within 8192 tokens
-    # We'll assume around 4 characters per token on average
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=3000,  # Approx. ~750 tokens
-        chunk_overlap=200
-    )
 
-    yield from text_splitter.split_text(text)
+def split_text_iterator(text: str) -> Iterator[str]:
+    """Yield split chunks of text for summarization."""
+    yield from RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=300).split_text(text)
 
-def gen_sum(chunk:str)->str:
-    return client.chat.completions.create(
+
+def summarize_chunk(chunk: str) -> str:
+    """Generate a summary for a given chunk."""
+    response = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {
                 "role": "system",
-                "content": "You are given an excerpt from a book chapter. Write a summary in a concise and comprehensive way, ensuring it covers all the key events and information presented. Your goal is to provide enough detail about the characters, the events and so forth, that someone who didn't fully pay attention to the chapter could understand what happened and feel prepared to continue reading. Stick to the facts presented in the summary and avoid any speculation, analysis, or personal opinions. Do not use bullet points, the output should be formatted as regular paragraphs.",
+                "content": "You are given an excerpt from a book chapter. Your task is to write a single, concise, and comprehensive summary that captures all key events and information. Do not use bullet points, numbered lists, or any symbols such as asterisks (*). The summary must be written entirely in full, well-structured paragraphs, using clear and coherent language throughout. Use an eloquent but still laidback tone, and use some fucking swear words for good measure where appropriate, kinda like how Joe Rogan, Rebecca Ferguson, Fleabag or deadmau5 speak.",
+            },
+            {"role": "user", "content": chunk.strip()},
+        ],
+    )
+    summary = response.choices[0].message.content.strip()
+    logger.debug(f"Chunk summary: {summary}")
+
+    return summary
+
+
+def combine_summaries(chunks: Iterable[str]) -> str:
+    """Generate a summary for a given chunk."""
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are given multiple summaries of sections from a book chapter. Your task is to write a single, concise, and comprehensive summary that captures all key events and information. Do not use bullet points, numbered lists, or any symbols such as asterisks (*). The summary must be written entirely in full, well-structured paragraphs, using clear and coherent language throughout. Use an eloquent but still laidback tone, and use some fucking swear words for good measure words where appropriate, kinda like how Joe Rogan, Rebecca Ferguson, Fleabag or deadmau5 speak.",
             },
             {
                 "role": "user",
-                "content": chunk.strip(),
+                "content": "\n\n".join(chunks).strip(),
             },
         ],
-    ).choices[0].message.content.strip()
+    )
+    summary = response.choices[0].message.content.strip()
+    logger.debug(f"Combined summary: {summary}")
 
-def chunk_summary_iterator(text:str)->Iterator[str]:
-    for chunk in split_text(text):
-        yield gen_sum(chunk)
+    return summary
 
-def generate_summary(text):
-    """Generate a summary using OpenAI's GPT model."""
+
+def generate_summary(text: str) -> str:
+    """Generate a full summary for a chapter."""
     try:
-        return "/n/n".join(chunk_summary_iterator(text))
+        if len(spl := tuple(split_text_iterator(text))) == 1:
+            return summarize_chunk(spl[0])
+        return combine_summaries(summarize_chunk(chunk) for chunk in spl)
+
     except Exception:
-        logger.exception("Failed to generate summary:")
+        logger.exception("Failed to generate summary")
         return "Summary not available."
 
 
-def confirm_conversion():
-    print("Do you want to continue? (y/n)")
-    answer = input()
-    if answer.lower() != "y":
+def confirm_conversion() -> None:
+    """Ask user to confirm before proceeding."""
+    if input("Do you want to continue? (y/n) ").strip().lower() != "y":
         print("Aborted.")
-        exit(0)
-
-
-def get_total_chars(chapters):
-    return sum(len(text) for _, text in chapters)
+        raise SystemExit
 
 
 class AudiobookGenerator:
     def __init__(self, config: GeneralConfig):
         self.config = config
 
-    def process_chapter(self, args):
+    def process_chapter(self, args) -> None:
         idx, title, text, book_parser, tts_provider = args
         try:
             logger.info(f"Processing chapter {idx}: {title}")
 
             if self.config.output_text:
-                text_file = self.config.output_folder / f"{idx:04d}_{title}.txt"
-                text_file.write_text(text, encoding="utf-8")
+                (self.config.output_folder / f"{idx:04d}_{title}.txt").write_text(text)
 
             if self.config.preview:
                 return
 
-            output_file = (
+            output_path = (
                 self.config.output_folder
                 / f"{idx:04d}_{title}.{tts_provider.get_output_file_extension()}"
             )
-            audio_tags = AudioTags(
+            tags = AudioTags(
                 title, book_parser.get_book_author(), book_parser.get_book_title(), idx
             )
-            tts_provider.text_to_speech(text, output_file, audio_tags)
+            tts_provider.text_to_speech(text, output_path, tags)
             logger.info(f"✅ Converted chapter {idx}: {title}")
         except Exception:
             logger.exception(f"Error processing chapter {idx}")
             raise
 
-    def run(self):
+    def run(self) -> None:
         try:
             book_parser = get_book_parser(self.config)
             tts_provider = get_tts_provider(self.config)
@@ -118,24 +131,20 @@ class AudiobookGenerator:
                 for idx, (title, text) in enumerate(self.chapter_iterator(chapters), start=1)
             )
 
-            with multiprocessing.Pool(processes=self.config.worker_count) as pool:
+            with multiprocessing.Pool(self.config.worker_count) as pool:
                 for _ in pool.imap_unordered(self.process_chapter, tasks):
                     pass
 
             logger.info("All chapters and summaries converted. 🎉")
         except KeyboardInterrupt:
             logger.info("Job stopped by user.")
-            exit()
+            raise SystemExit
 
-    def chapter_iterator(self, chapters):
-        chapters = [(title, text) for title, text in chapters if text.strip()]
-        logger.info(f"Chapters count: {len(chapters)}.")
-        if self.config.chapter_end == -1:
-            self.config.chapter_end = len(chapters)
-        chapters_to_process = chapters[self.config.chapter_start - 1 : self.config.chapter_end]
+    def chapter_iterator(self, chapters) -> Iterator[tuple[str, str]]:
+        filtered = [(title, text) for title, text in chapters if text.strip()]
+        logger.info("Chapters count: %d.", len(filtered))
 
-        for chapter in chapters_to_process:
-            title, text = chapter
-
-            # yield title, text
-            yield f"Summary_of_{title}", "Chapter summary\n\n" + generate_summary(text)
+        end = self.config.chapter_end or len(filtered)
+        for title, text in filtered[self.config.chapter_start - 1 : end]:
+            yield title, text
+            yield f"Summary_of_{title}", f"Chapter summary\n\n{generate_summary(text)}"
