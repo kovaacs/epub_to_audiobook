@@ -1,11 +1,10 @@
 import logging
 from collections.abc import Iterator, Iterable
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import openai
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from tqdm import tqdm
 
 from audiobook_generator.book_parsers.base_book_parser import get_book_parser
 from audiobook_generator.config.general_config import GeneralConfig
@@ -19,24 +18,38 @@ client = openai.OpenAI(
     base_url="http://host.docker.internal:8080/v1",
 )
 
-MAIN_PROMPT = (
-    "{0} Your task is to write a single, concise, "
-    "and comprehensive fucking summary that captures all key events and information. Do not use bullet points, "
-    "numbered lists, or any symbols such as asterisks (*) for fuck's sake. The summary must be written entirely in full, "
-    "well-structured paragraphs, using clear and coherent fucking language throughout. Use an eloquent but still very fucking vulgar, "
-    "laidback tone, and use some fucking swear words for good measure, kinda like how "
-    "Joe Rogan, Rebecca Ferguson or Fleabag speak."
-)
+#  = (
+#     "Write a concise, FACTUAL, and comprehensive summary using only the provided section summaries. No opinions. No added context. "
+#     "Use full, well-structured paragraphs in clear, coherent, academic language—liberally spiced with profanity. "
+#     "Start immediately with the summary. No introductions, no disclaimers, no bullshit."
+# )
 
+
+# FINAL_SUMMARY = (
+#     "Your task is to write a concise, FACTUAL and comprehensive summary of the provided text that captures all key events and information. DO NOT provide your opinion. Only work with the information that was provided to you."
+#     "The summary must be written entirely in full and well-structured paragraphs. Use an eloquent academic tone, and use a very generous amount of swear words to spice things up. "
+#     "Do NOT include any introduction, commentary, or acknowledgment of these instructions. Do NOT use phrases like 'okay, here is your summary' or any bullshit lead-ins. Start immediately with the damn summary."
+# )
+
+FINAL_SUMMARY = (
+    "Your task is to write a concise, FACTUAL and comprehensive summary of the provided text that captures all key events and information, using only the information provided."
+    "The summary must be written entirely in full and well-structured paragraphs. Use an eloquent academic tone, and use a very fucking generous amount of swear words to spice things up. "
+    "Do NOT include any introduction, commentary, or acknowledgment of these instructions. Now, get on with the fucking summary."
+)
 
 def split_text_iterator(text: str) -> Iterator[str]:
     """Yield split chunks of text for summarization."""
-    yield from RecursiveCharacterTextSplitter(chunk_size=3000, chunk_overlap=300).split_text(text)
+    yield from RecursiveCharacterTextSplitter(
+        chunk_size=6000,
+        chunk_overlap=600,
+        separators=["\n\n", "\n", ". ", " ", ""],
+        keep_separator="end",
+    ).split_text(text)
 
 
 def summarize_chunk(chunk: str) -> str:
     """Generate a summary for a given chunk."""
-    summary = invoke(MAIN_PROMPT.format("You are given an excerpt from a book chapter."), chunk)
+    summary = invoke(FINAL_SUMMARY, chunk)
     logger.debug(f"Chunk summary: {summary}")
 
     return summary
@@ -44,8 +57,12 @@ def summarize_chunk(chunk: str) -> str:
 
 def chapter_iterator(chapters: Iterable[tuple[str, str]]) -> Iterator[tuple[str, str]]:
     for title, text in chapters:
-        # yield title, text
-        yield f"Summary_of_{title}", f"Chapter summary\n\n{summarize_text(text)}"
+        yield title, text
+
+        summary = summarize_text(text)
+        logger.info(summary)
+
+        yield f"Summary_of_{title}", f"Chapter summary\n\n{summary}"
 
 
 def invoke(prompt: str, content: str):
@@ -67,10 +84,7 @@ def invoke(prompt: str, content: str):
 
 def combine_summaries(chunks: Iterable[str]) -> str:
     """Combine multiple summaries into one."""
-    summary = invoke(
-        MAIN_PROMPT.format("You are given multiple summaries of sections from a book chapter."),
-        "\n---\n".join(chunks),
-    )
+    summary = invoke(FINAL_SUMMARY, "\n\n".join(chunks))
     logger.debug(f"Combined summary: {summary}")
 
     return summary
@@ -80,9 +94,12 @@ def summarize_text(text: str) -> str:
     """Generate a full summary for a chapter."""
     try:
         chunks = tuple(split_text_iterator(text))
-        summaries = (summarize_chunk(chunk) for chunk in chunks)
 
-        return combine_summaries(summaries) if len(chunks) > 1 else next(summaries)
+        if len(chunks) == 1:
+            return combine_summaries(chunks)
+        else:
+            return combine_summaries(summarize_chunk(chunk) for chunk in chunks)
+
     except Exception:
         logger.exception("Failed to generate summary")
         return "Summary not available."
@@ -146,13 +163,11 @@ class AudiobookGenerator:
                 for idx, (title, text) in enumerate(chapter_iterator(chapters_to_process), start=1)
             )
 
-            with ProcessPoolExecutor(max_workers=self.config.worker_count) as executor:
-                for _ in tqdm(
-                    as_completed(executor.submit(self.process_chapter, task) for task in tasks),
-                    total=len(chapters_to_process),
-                    desc="Processing chapters",
-                ):
-                    pass
+            with ThreadPoolExecutor(max_workers=self.config.worker_count) as executor:
+                futures = [executor.submit(self.process_chapter, task) for task in tasks]
+
+                for r in as_completed(futures):
+                    r.result()
 
             logger.info("All chapters and summaries converted. 🎉")
         except KeyboardInterrupt:
