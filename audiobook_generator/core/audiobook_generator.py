@@ -3,7 +3,9 @@ from collections.abc import Iterator, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+import math
 import openai
+import tiktoken
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from audiobook_generator.book_parsers.base_book_parser import get_book_parser
@@ -32,20 +34,53 @@ client = openai.OpenAI(
 # )
 
 FINAL_SUMMARY = (
-    "Your task is to write a concise, FACTUAL and comprehensive summary of the provided text that captures all key events and information, using only the information provided."
+    "Your task is to write a concise, FACTUAL and comprehensive summary of the provided text that captures all key events and information, using ONLY the information provided."
     "The summary must be written entirely in full and well-structured paragraphs. Use an eloquent academic tone, and use a very fucking generous amount of swear words to spice things up. "
     "Do NOT include any introduction, commentary, or acknowledgment of these instructions. Now, get on with the fucking summary."
 )
 
-def split_text_iterator(text: str) -> Iterator[str]:
-    """Yield split chunks of text for summarization."""
-    yield from RecursiveCharacterTextSplitter(
-        chunk_size=6000,
-        chunk_overlap=600,
+def split_text_iterator(text: str, model: str = "gpt-4o") -> Iterator[str]:
+    """Yield split chunks of text guaranteed to fit within 16k context window."""
+    enc = tiktoken.encoding_for_model(model)
+
+    # Context window
+    max_ctx = 16384
+    reserved = 2000   # leave room for system/instructions
+    max_tokens_per_chunk = max_ctx - reserved
+
+    # First-pass split by characters
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=5000,            # conservative, character-based
+        chunk_overlap=500,
         separators=["\n\n", "\n", ". ", " ", ""],
         keep_separator="end",
-    ).split_text(text)
+    )
 
+    for chunk in splitter.split_text(text):
+        tokens = enc.encode(chunk)
+
+        # If chunk fits, yield directly
+        if len(tokens) <= max_tokens_per_chunk:
+            yield chunk
+        else:
+            # Re-split oversized chunk into smaller safe chunks
+            # Roughly target 80% of available tokens as characters
+            avg_char_per_token = max(1, len(chunk) // len(tokens))
+            safe_char_size = max_tokens_per_chunk * avg_char_per_token * 8 // 10
+
+            sub_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=safe_char_size,
+                chunk_overlap=int(safe_char_size * 0.1),
+                separators=["\n\n", "\n", ". ", " ", ""],
+                keep_separator="end",
+            )
+            for sub_chunk in sub_splitter.split_text(chunk):
+                # Final guarantee: trim any outliers by tokens
+                sub_tokens = enc.encode(sub_chunk)
+                if len(sub_tokens) > max_tokens_per_chunk:
+                    # hard trim
+                    sub_chunk = enc.decode(sub_tokens[:max_tokens_per_chunk])
+                yield sub_chunk
 
 def summarize_chunk(chunk: str) -> str:
     """Generate a summary for a given chunk."""
@@ -58,9 +93,11 @@ def summarize_chunk(chunk: str) -> str:
 def chapter_iterator(chapters: Iterable[tuple[str, str]]) -> Iterator[tuple[str, str]]:
     for title, text in chapters:
         yield title, text
-
-        summary = summarize_text(text)
-        logger.info(summary)
+        try:
+            summary = summarize_text(text)
+            logger.info(summary)
+        except Exception as e:
+            summary = f"Couldn't generate summary: {e}"
 
         yield f"Summary_of_{title}", f"Chapter summary\n\n{summary}"
 
@@ -92,17 +129,13 @@ def combine_summaries(chunks: Iterable[str]) -> str:
 
 def summarize_text(text: str) -> str:
     """Generate a full summary for a chapter."""
-    try:
-        chunks = tuple(split_text_iterator(text))
 
-        if len(chunks) == 1:
-            return combine_summaries(chunks)
-        else:
-            return combine_summaries(summarize_chunk(chunk) for chunk in chunks)
+    chunks = tuple(split_text_iterator(text))
 
-    except Exception:
-        logger.exception("Failed to generate summary")
-        return "Summary not available."
+    if len(chunks) == 1:
+        return combine_summaries(chunks)
+    else:
+        return combine_summaries(summarize_chunk(chunk) for chunk in chunks)
 
 
 def confirm_conversion() -> None:
