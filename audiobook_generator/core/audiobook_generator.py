@@ -3,7 +3,6 @@ from collections.abc import Iterator, Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import math
 import openai
 import tiktoken
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -35,7 +34,7 @@ client = openai.OpenAI(
 
 FINAL_SUMMARY = (
     "Your task is to write a concise, FACTUAL and comprehensive summary of the provided text that captures all key events and information, using ONLY the information provided."
-    "The summary must be written entirely in full and well-structured paragraphs. Use an eloquent academic tone, and use a very fucking generous amount of swear words to spice things up. "
+    "The summary must be written entirely in full and well-structured paragraphs. Use a very fucking generous amount of swear words to spice things up. "
     "Do NOT include any introduction, commentary, or acknowledgment of these instructions. Now, get on with the fucking summary."
 )
 
