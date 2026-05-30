@@ -1,7 +1,7 @@
 import logging
 import tempfile
-import os
 import io
+from pathlib import Path
 from pydub import AudioSegment
 from mutagen.id3._frames import TIT2, TPE1, TALB, TRCK
 from mutagen.id3 import ID3, ID3NoHeaderError
@@ -222,7 +222,7 @@ def pydub_merge_audio_segments(tmp_files: list[str], output_file: str, output_fo
 
     # Delete the temporary files
     for tmp_file in tmp_files:
-        os.remove(tmp_file)
+        Path(tmp_file).unlink()
     logger.debug(f"Temporary files deleted: {tmp_files}")
 
 

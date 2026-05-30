@@ -2,6 +2,7 @@ import logging
 import multiprocessing
 import os
 from collections.abc import Iterable, Iterator
+from pathlib import Path
 
 from audiobook_generator.book_parsers.base_book_parser import get_book_parser
 from audiobook_generator.config.general_config import GeneralConfig
@@ -185,7 +186,7 @@ class AudiobookGenerator:
                     ext=".txt",
                     collision_check=False,
                 )
-                text_file = os.path.join(self.config.output_folder, safe_txt_name)
+                text_file = Path(self.config.output_folder) / safe_txt_name
                 with open(text_file, "w", encoding="utf-8") as f:
                     f.write(text)
 
@@ -202,7 +203,7 @@ class AudiobookGenerator:
                 ext=audio_ext,
                 collision_check=False,
             )
-            output_file = os.path.join(self.config.output_folder, safe_audio_name)
+            output_file = Path(self.config.output_folder) / safe_audio_name
 
             audio_tags = AudioTags(
                 title, book_parser.get_book_author(), book_parser.get_book_title(), idx
@@ -227,12 +228,12 @@ class AudiobookGenerator:
             book_parser = get_book_parser(self.config)
             tts_provider = get_tts_provider(self.config)
 
-            os.makedirs(self.config.output_folder, exist_ok=True)
+            Path(self.config.output_folder).mkdir(parents=True, exist_ok=True)
 
             if self.config.save_cover:
                 if cover := book_parser.get_cover():
-                    ext = os.path.splitext(cover.file_name)[1]
-                    cover_path = os.path.join(self.config.output_folder, f"cover{ext}")
+                    ext = Path(cover.file_name).suffix
+                    cover_path = Path(self.config.output_folder) / f"cover{ext}"
 
                     with open(cover_path, "wb") as f:
                         f.write(cover.get_content())

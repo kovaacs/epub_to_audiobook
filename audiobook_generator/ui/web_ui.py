@@ -1,6 +1,6 @@
 from multiprocessing import Process
-import os
 from datetime import datetime
+from pathlib import Path
 
 import gradio as gr
 from gradio_log import Log
@@ -129,7 +129,7 @@ def terminate_audiobook_generator():
         print("Audiobook generator terminated manually")
 
 def host_ui(config):
-    default_output_dir = os.path.join("audiobook_output", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    default_output_dir = Path("audiobook_output") / datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     print(f"Default audiobook output directory: {default_output_dir}")
     with gr.Blocks(analytics_enabled=False, title="Epub to Audiobook Converter") as ui:
         with gr.Row(equal_height=True):

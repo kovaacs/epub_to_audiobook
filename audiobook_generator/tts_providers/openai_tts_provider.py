@@ -2,7 +2,6 @@ import io
 import logging
 import math
 import tempfile
-import os
 from pydub import AudioSegment
 
 from openai import OpenAI

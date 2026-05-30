@@ -1,11 +1,13 @@
 import hashlib
 import os
 import unicodedata
+from pathlib import Path
 
 
 def _detect_name_max(path):
     """Return NAME_MAX for filesystem containing path, or sane default."""
-    directory = path if os.path.isdir(path) else os.path.dirname(path) or "."
+    p = Path(path)
+    directory = p if p.is_dir() else p.parent
     try:
         name_max = os.pathconf(directory, "PC_NAME_MAX")
         if isinstance(name_max, int) and name_max >= 64:
@@ -111,8 +113,8 @@ def make_safe_filename(
         candidate = minimal
 
     if collision_check:
-        full_path = os.path.join(output_dir, candidate)
-        if os.path.exists(full_path):
+        full_path = Path(output_dir) / candidate
+        if full_path.exists():
             raise RuntimeError(
                 "Filename collision detected for '%s'. Adjust make_safe_filename "
                 "strategy." % full_path
