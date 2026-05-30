@@ -86,6 +86,7 @@ def _summarize_chapter(text: str, client, model: str) -> str:
     chunks = _split_for_summary(text, model)
     if len(chunks) == 1:
         return _invoke_summary(client, model, chunks[0])
+
     summaries = [_invoke_summary(client, model, c) for c in chunks]
     return _invoke_summary(client, model, "\n\n".join(summaries))
 
@@ -109,14 +110,25 @@ def chapter_summary_iterator(
             try:
                 result = _summarize_chapter(text, client, model)
                 if result.strip():
-                    summary = result
-                    logger.info(f"Summary for '{title}':\n{summary}")
-                    break
+                    result_words = len(result.split())
+
+                    if result_words > word_count:
+                        logger.warning(
+                            f"Summary for '{title}' is longer than the chapter "
+                            f"({result_words} > {word_count} words), discarding."
+                        )
+                    else:
+                        summary = result
+                        logger.info(f"Summary for '{title}':\n{summary}")
+                        break
+
                 logger.warning(f"Empty summary for '{title}' (attempt {attempt}/3), retrying...")
             except Exception as e:
                 logger.warning(f"Summary failed for '{title}' (attempt {attempt}/3): {e}")
+
         if not summary:
             summary = "Couldn't generate summary after 3 attempts."
+
         yield f"Summary_of_{title}", f"Chapter summary\n\n{summary}"
 
 
