@@ -29,6 +29,9 @@ class BaseBookParser:  # Base interface for books parsers
     def get_chapters(self, break_string) -> List[Tuple[str, str]]:
         raise NotImplementedError
 
+    def get_cover(self) -> None:
+        return None
+
 
 # Common support methods for all book parsers
 

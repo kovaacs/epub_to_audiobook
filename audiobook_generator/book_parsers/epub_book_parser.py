@@ -29,10 +29,11 @@ class EpubBookParser(BaseBookParser):
     def get_book(self):
         return self.book
 
-    def get_cover(self):
+    def get_cover(self) -> epub.EpubItem | None:
         for item in self.book.get_items_of_type(ebooklib.ITEM_IMAGE):
             if "cover" in item.file_name.lower():
                 return item
+        return None
 
     def get_book_title(self) -> str:
         if self.book.get_metadata('DC', 'title'):

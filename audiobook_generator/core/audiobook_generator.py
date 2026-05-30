@@ -21,12 +21,15 @@ CHAPTER_SUMMARY_PROMPT = (
 )
 
 
-def _make_summary_client(config):
+def _make_summary_client(config: GeneralConfig):
     import openai
-    kwargs = {"api_key": os.environ.get("OPENAI_API_KEY", "no-key")}
+
+    api_key = os.environ.get("OPENAI_API_KEY", "no-key")
+
     if config.summary_base_url:
-        kwargs["base_url"] = config.summary_base_url
-    return openai.OpenAI(**kwargs)
+        return openai.OpenAI(api_key=api_key, base_url=config.summary_base_url)
+
+    return openai.OpenAI(api_key=api_key)
 
 
 def _invoke_summary(client, model: str, text: str) -> str:
@@ -43,7 +46,7 @@ def _invoke_summary(client, model: str, text: str) -> str:
     )
 
 
-def _split_for_summary(text: str, model: str) -> list:
+def _split_for_summary(text: str, model: str) -> Iterator[str]:
     import tiktoken
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -60,11 +63,11 @@ def _split_for_summary(text: str, model: str) -> list:
         keep_separator="end",
     )
 
-    chunks = []
     for chunk in splitter.split_text(text):
         tokens = enc.encode(chunk)
+
         if len(tokens) <= max_tokens:
-            chunks.append(chunk)
+            yield chunk
         else:
             avg_chars = max(1, len(chunk) // len(tokens))
             safe_size = max_tokens * avg_chars * 8 // 10
@@ -74,21 +77,23 @@ def _split_for_summary(text: str, model: str) -> list:
                 separators=["\n\n", "\n", ". ", " ", ""],
                 keep_separator="end",
             )
+
             for sub in sub_splitter.split_text(chunk):
                 sub_tokens = enc.encode(sub)
+
                 if len(sub_tokens) > max_tokens:
                     sub = enc.decode(sub_tokens[:max_tokens])
-                chunks.append(sub)
-    return chunks
+
+                yield sub
 
 
 def _summarize_chapter(text: str, client, model: str) -> str:
-    chunks = _split_for_summary(text, model)
+    chunks = tuple(_split_for_summary(text, model))
+
     if len(chunks) == 1:
         return _invoke_summary(client, model, chunks[0])
 
-    summaries = [_invoke_summary(client, model, c) for c in chunks]
-    return _invoke_summary(client, model, "\n\n".join(summaries))
+    return _invoke_summary(client, model, "\n\n".join(_invoke_summary(client, model, c) for c in chunks))
 
 
 def chapter_summary_iterator(
@@ -100,29 +105,40 @@ def chapter_summary_iterator(
     """Yield each chapter followed by an AI-generated summary chapter."""
     for title, text in chapters:
         yield title, text
+
         word_count = len(text.split())
+
         if min_words and word_count < min_words:
             logger.info(f"Skipping summary for '{title}' ({word_count} words < {min_words} min).")
+
             yield f"Summary_of_{title}", f"Chapter summary\n\nThis chapter is too brief to summarize."
+
             continue
+
         summary = None
+
         for attempt in range(1, 4):
             try:
                 result = _summarize_chapter(text, client, model)
-                if result.strip():
-                    result_words = len(result.split())
 
-                    if result_words > word_count:
-                        logger.warning(
-                            f"Summary for '{title}' is longer than the chapter "
-                            f"({result_words} > {word_count} words), discarding."
-                        )
-                    else:
-                        summary = result
-                        logger.info(f"Summary for '{title}':\n{summary}")
-                        break
+                if not result.strip():
+                    logger.warning(f"Empty summary for '{title}' (attempt {attempt}/3), retrying...")
+                    continue
 
-                logger.warning(f"Empty summary for '{title}' (attempt {attempt}/3), retrying...")
+                result_words = len(result.split())
+                
+                if result_words > word_count:
+                    logger.warning(
+                        f"Summary for '{title}' is longer than the chapter "
+                        f"({result_words} > {word_count} words), discarding."
+                    )
+                    continue
+
+                summary = result
+                logger.info(f"Summary for '{title}':\n{summary}")
+                
+                break
+
             except Exception as e:
                 logger.warning(f"Summary failed for '{title}' (attempt {attempt}/3): {e}")
 
@@ -214,15 +230,14 @@ class AudiobookGenerator:
             os.makedirs(self.config.output_folder, exist_ok=True)
 
             if self.config.save_cover:
-                get_cover = getattr(book_parser, "get_cover", None)
-                if get_cover:
-                    cover = get_cover()
-                    if cover:
-                        ext = os.path.splitext(cover.file_name)[1]
-                        cover_path = os.path.join(self.config.output_folder, f"cover{ext}")
-                        with open(cover_path, "wb") as f:
-                            f.write(cover.get_content())
-                        logger.info(f"Cover image saved as cover{ext}")
+                if cover := book_parser.get_cover():
+                    ext = os.path.splitext(cover.file_name)[1]
+                    cover_path = os.path.join(self.config.output_folder, f"cover{ext}")
+
+                    with open(cover_path, "wb") as f:
+                        f.write(cover.get_content())
+
+                    logger.info(f"Cover image saved as cover{ext}")
 
             chapters = book_parser.get_chapters(tts_provider.get_break_string())
             # Filter out empty or very short chapters
@@ -281,17 +296,12 @@ class AudiobookGenerator:
                         self.config.summary_min_length,
                     )
                 )
-                tasks = [
-                    (idx, title, text, book_parser)
-                    for idx, (title, text) in enumerate(chapters_to_process, start=1)
-                ]
-            else:
-                tasks = [
-                    (idx, title, text, book_parser)
-                    for idx, (title, text) in enumerate(
-                        chapters_to_process, start=self.config.chapter_start
-                    )
-                ]
+
+            start = 1 if self.config.chapter_summary else self.config.chapter_start
+            tasks = [
+                (idx, title, text, book_parser)
+                for idx, (title, text) in enumerate(chapters_to_process, start=start)
+            ]
 
             # Track failed chapters
             failed_chapters = []
