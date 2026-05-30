@@ -2,6 +2,7 @@ import logging
 import tempfile
 import io
 from pathlib import Path
+
 from pydub import AudioSegment
 from mutagen.id3._frames import TIT2, TPE1, TALB, TRCK
 from mutagen.id3 import ID3, ID3NoHeaderError

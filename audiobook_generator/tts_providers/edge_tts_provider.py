@@ -1,7 +1,7 @@
 import asyncio
+import io
 import logging
 import math
-import io
 from time import sleep
 
 import edge_tts

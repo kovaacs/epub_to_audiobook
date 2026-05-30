@@ -1,7 +1,7 @@
-import dataclasses
+from dataclasses import dataclass
 
 
-@dataclasses.dataclass
+@dataclass
 class AudioTags:
     title: str  # for TIT2
     author: str  # for TPE1

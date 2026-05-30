@@ -1,10 +1,9 @@
 import io
 import logging
 import math
-import tempfile
-from pydub import AudioSegment
 
 from openai import OpenAI
+from pydub import AudioSegment
 
 from audiobook_generator.core.audio_tags import AudioTags
 from audiobook_generator.config.general_config import GeneralConfig
