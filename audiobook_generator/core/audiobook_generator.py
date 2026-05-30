@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 CHAPTER_SUMMARY_PROMPT = (
     "Your task is to write a concise, FACTUAL and comprehensive summary of the provided text that captures all key events and information, using ONLY the information provided. "
     "The summary must be written entirely in full and well-structured paragraphs. Use a very fucking generous amount of swear words to spice things up. "
+    "Do NOT invent, infer, or expand upon anything not explicitly stated in the text. "
+    "If the text is too short or lacks substantive content to summarize, respond with exactly: 'This chapter is too brief to summarize.' "
     "Do NOT include any introduction, commentary, or acknowledgment of these instructions. Now, get on with the fucking summary."
 )
 
@@ -92,10 +94,16 @@ def chapter_summary_iterator(
     chapters: Iterable,
     client,
     model: str,
+    min_words: int | None = None,
 ) -> Iterator:
     """Yield each chapter followed by an AI-generated summary chapter."""
     for title, text in chapters:
         yield title, text
+        word_count = len(text.split())
+        if min_words and word_count < min_words:
+            logger.info(f"Skipping summary for '{title}' ({word_count} words < {min_words} min).")
+            yield f"Summary_of_{title}", f"Chapter summary\n\nThis chapter is too brief to summarize."
+            continue
         summary = None
         for attempt in range(1, 4):
             try:
@@ -254,7 +262,12 @@ class AudiobookGenerator:
                 summary_client = _make_summary_client(self.config)
                 summary_model = self.config.summary_model or "gpt-4"
                 chapters_to_process = list(
-                    chapter_summary_iterator(chapters_to_process, summary_client, summary_model)
+                    chapter_summary_iterator(
+                        chapters_to_process,
+                        summary_client,
+                        summary_model,
+                        self.config.summary_min_length,
+                    )
                 )
                 tasks = [
                     (idx, title, text, book_parser)

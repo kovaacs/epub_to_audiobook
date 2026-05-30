@@ -9,6 +9,7 @@ class GeneralConfig:
         self.chapter_summary = getattr(args, 'chapter_summary', None)
         self.summary_base_url = getattr(args, 'summary_base_url', None)
         self.summary_model = getattr(args, 'summary_model', None)
+        self.summary_min_length = getattr(args, 'summary_min_length', None)
         self.log = getattr(args, 'log', None)
         self.log_file = None
         self.no_prompt = getattr(args, 'no_prompt', None)

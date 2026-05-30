@@ -81,13 +81,18 @@ def handle_args():
     )
     parser.add_argument(
         "--summary_base_url",
-        default=None,
         help="Base URL for the OpenAI-compatible API used for chapter summaries (e.g. http://localhost:8080/v1). Defaults to the official OpenAI API.",
     )
     parser.add_argument(
         "--summary_model",
         default="gpt-4",
         help="Model name to use for chapter summary generation (default: gpt-4).",
+    )
+    parser.add_argument(
+        "--summary_min_length",
+        type=int,
+        default=100,
+        help="Minimum word count for a chapter to get a summary. Shorter chapters are skipped to avoid hallucinations (default: 100).",
     )
     parser.add_argument(
         "--remove_endnotes",

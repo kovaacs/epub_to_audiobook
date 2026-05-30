@@ -22,7 +22,7 @@ JOBS=4
 
 # Run the Docker container to convert EPUB to audiobook (generates MP3 files)
 docker run -i -t --rm -v "$(pwd)":/app "$DOCKER_IMAGE" "$EPUB_FILE" "$OUTPUT_DIR" \
-    --tts edge --voice_name "$VOICE_NAME" --no_prompt --worker_count "$JOBS" --save_cover
+    --tts edge --voice_name "$VOICE_NAME" --no_prompt --worker_count "$JOBS" --save_cover --chapter_summary --summary_base_url "http://host.docker.internal:8080/v1"
 
 # Fix MP3 durations by re-encoding with FFmpeg in parallel (in-place)
 # Hardcoded to match original TTS output: 32 kbps CBR, mono, 24 kHz
