@@ -1,6 +1,5 @@
 import logging
 import re
-from typing import List, Tuple
 
 import ebooklib
 from bs4 import BeautifulSoup
@@ -45,7 +44,7 @@ class EpubBookParser(BaseBookParser):
             return self.book.get_metadata("DC", "creator")[0][0]
         return "Unknown"
 
-    def get_chapters(self, break_string) -> List[Tuple[str, str]]:
+    def get_chapters(self, break_string) -> list[tuple[str, str]]:
         chapters = []
         search_and_replaces = self.get_search_and_replaces()
         for item in self.book.get_items_of_type(ebooklib.ITEM_DOCUMENT):

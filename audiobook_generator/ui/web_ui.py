@@ -1,5 +1,4 @@
 from multiprocessing import Process
-from typing import Optional
 import os
 from datetime import datetime
 
@@ -18,7 +17,7 @@ from audiobook_generator.utils.log_handler import generate_unique_log_path
 from main import main
 
 selected_tts = "Edge"
-running_process: Optional[Process] = None
+running_process: Process | None = None
 webui_log_file = None
 
 def on_tab_change(evt: gr.SelectData):

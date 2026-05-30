@@ -1,19 +1,16 @@
 import logging
-from typing import List
 import tempfile
 import os
 import io
 from pydub import AudioSegment
 from mutagen.id3._frames import TIT2, TPE1, TALB, TRCK
 from mutagen.id3 import ID3, ID3NoHeaderError
-from typing import List
 from sentencex import segment
-import os
 
 logger = logging.getLogger(__name__)
 
 
-def split_text(text: str, max_chars: int, language: str) -> List[str]:
+def split_text(text: str, max_chars: int, language: str) -> list[str]:
     """
     Split text into chunks, where each chunk is as close to max_chars as possible.
     
@@ -82,7 +79,7 @@ def split_text(text: str, max_chars: int, language: str) -> List[str]:
     
     return chunks
 
-def split_long_sentence(sentence: str, max_chars: int) -> List[str]:
+def split_long_sentence(sentence: str, max_chars: int) -> list[str]:
     """
     Split a long sentence into smaller parts based on punctuation and spaces.
     
@@ -199,7 +196,7 @@ def save_segment_tmp(segment: io.BytesIO, output_format: str, prefix: str = None
         return tmp_file.name
 
 
-def pydub_merge_audio_segments(tmp_files: List[str], output_file: str, output_format: str) -> None:
+def pydub_merge_audio_segments(tmp_files: list[str], output_file: str, output_format: str) -> None:
     """
     Merge multiple audio segments into one and set audio tags
     
@@ -229,7 +226,7 @@ def pydub_merge_audio_segments(tmp_files: List[str], output_file: str, output_fo
     logger.debug(f"Temporary files deleted: {tmp_files}")
 
 
-def direct_merge_audio_segments(audio_segments: List[io.BytesIO], output_file: str) -> None:
+def direct_merge_audio_segments(audio_segments: list[io.BytesIO], output_file: str) -> None:
     """
     Directly write multiple audio segments into one file without using pydub
     
@@ -249,8 +246,8 @@ def direct_merge_audio_segments(audio_segments: List[io.BytesIO], output_file: s
     logger.debug(f"Direct writing completed: {output_file}")
 
 
-def merge_audio_segments(audio_segments: List[io.BytesIO], output_file: str, output_format: str, 
-                          chunk_ids: List[str], use_pydub_merge: bool) -> None:
+def merge_audio_segments(audio_segments: list[io.BytesIO], output_file: str, output_format: str,
+                          chunk_ids: list[str], use_pydub_merge: bool) -> None:
     """
     Merge audio segments using either pydub or direct write method based on configuration
     

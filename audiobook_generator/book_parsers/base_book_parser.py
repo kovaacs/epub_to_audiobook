@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 from audiobook_generator.config.general_config import GeneralConfig
 
 EPUB = "epub"
@@ -26,7 +24,7 @@ class BaseBookParser:  # Base interface for books parsers
     def get_book_author(self) -> str:
         raise NotImplementedError
 
-    def get_chapters(self, break_string) -> List[Tuple[str, str]]:
+    def get_chapters(self, break_string) -> list[tuple[str, str]]:
         raise NotImplementedError
 
     def get_cover(self) -> None:
@@ -35,7 +33,7 @@ class BaseBookParser:  # Base interface for books parsers
 
 # Common support methods for all book parsers
 
-def get_supported_book_parsers() -> List[str]:
+def get_supported_book_parsers() -> list[str]:
     return [EPUB]
 
 

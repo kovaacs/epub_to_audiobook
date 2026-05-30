@@ -1,5 +1,3 @@
-from typing import List
-
 from audiobook_generator.config.general_config import GeneralConfig
 
 TTS_AZURE = "azure"
@@ -34,7 +32,7 @@ class BaseTTSProvider:  # Base interface for TTS providers
 
 
 # Common support methods for all TTS providers
-def get_supported_tts_providers() -> List[str]:
+def get_supported_tts_providers() -> list[str]:
     return [TTS_AZURE, TTS_OPENAI, TTS_EDGE, TTS_PIPER]
 
 
