@@ -1,3 +1,4 @@
+langchain-text-splitters
 beautifulsoup4==4.12.3
 EbookLib==0.18
 mutagen==1.47.0

@@ -92,11 +92,19 @@ def summarize_chunk(chunk: str) -> str:
 def chapter_iterator(chapters: Iterable[tuple[str, str]]) -> Iterator[tuple[str, str]]:
     for title, text in chapters:
         yield title, text
-        try:
-            summary = summarize_text(text)
-            logger.info(summary)
-        except Exception as e:
-            summary = f"Couldn't generate summary: {e}"
+        summary = None
+        for attempt in range(1, 4):
+            try:
+                result = summarize_text(text)
+                if result.strip():
+                    summary = result
+                    logger.info(summary)
+                    break
+                logger.warning(f"Empty summary for '{title}' (attempt {attempt}/3), retrying...")
+            except Exception as e:
+                logger.warning(f"Summary generation failed for '{title}' (attempt {attempt}/3): {e}")
+        if not summary:
+            summary = "Couldn't generate summary after 3 attempts."
 
         yield f"Summary_of_{title}", f"Chapter summary\n\n{summary}"
 
