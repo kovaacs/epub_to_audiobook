@@ -70,6 +70,26 @@ def handle_args():
         help="Enable Output Text. This will export a plain text file for each chapter specified and write the files to the output folder specified.",
     )
     parser.add_argument(
+        "--save_cover",
+        action="store_true",
+        help="Save the book's cover image to the output folder. Useful for post-processing with tools like m4b-tool.",
+    )
+    parser.add_argument(
+        "--chapter_summary",
+        action="store_true",
+        help="Generate an AI summary after each chapter and include it as an additional audio chapter. Requires an OpenAI-compatible API (set OPENAI_API_KEY, or use --summary_base_url for a local endpoint).",
+    )
+    parser.add_argument(
+        "--summary_base_url",
+        default=None,
+        help="Base URL for the OpenAI-compatible API used for chapter summaries (e.g. http://localhost:8080/v1). Defaults to the official OpenAI API.",
+    )
+    parser.add_argument(
+        "--summary_model",
+        default="gpt-4",
+        help="Model name to use for chapter summary generation (default: gpt-4).",
+    )
+    parser.add_argument(
         "--remove_endnotes",
         action="store_true",
         help="This will remove endnote numbers from the end or middle of sentences. This is useful for academic books.",

@@ -5,6 +5,10 @@ class GeneralConfig:
         self.output_folder = getattr(args, 'output_folder', None)
         self.preview = getattr(args, 'preview', None)
         self.output_text = getattr(args, 'output_text', None)
+        self.save_cover = getattr(args, 'save_cover', None)
+        self.chapter_summary = getattr(args, 'chapter_summary', None)
+        self.summary_base_url = getattr(args, 'summary_base_url', None)
+        self.summary_model = getattr(args, 'summary_model', None)
         self.log = getattr(args, 'log', None)
         self.log_file = None
         self.no_prompt = getattr(args, 'no_prompt', None)
